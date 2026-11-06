@@ -1,0 +1,14 @@
+PERBAIKAN AUDIT BEKAL PAGI MOBILE
+
+Perubahan:
+1. Rekap pembayaran dan ringkasan laporan sekarang dihitung dari incomingHistory (data yang dimuat dari Supabase), bukan dari state kolom input yang dapat berubah sebelum disimpan.
+2. Perhitungan barang masuk dibatasi pada business_date hari ini.
+3. Perhitungan retur pada rekap juga dibatasi pada business_date hari ini.
+4. Jika ditemukan kombinasi bawaan ganda pada tanggal hari ini saat proses simpan, aplikasi menghentikan penyimpanan dan memberi peringatan; tidak memilih salah satu baris secara diam-diam.
+5. Rekap pembayaran memberi peringatan bila ada member dengan retur lebih besar dari bawaan (misalnya Atma), agar tidak dianggap rekap normal.
+
+PENTING:
+- Tidak ada SQL migrasi atau penghapusan data.
+- Jangan jalankan ulang supabase/schema.sql.
+- Simpan salinan folder proyek lama sebelum mengganti file.
+- Build belum berhasil diverifikasi karena instalasi dependensi timeout pada lingkungan pemeriksaan.

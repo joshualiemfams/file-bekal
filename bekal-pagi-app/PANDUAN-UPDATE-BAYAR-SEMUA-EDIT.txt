@@ -1,0 +1,21 @@
+UPDATE BEKAL PAGI MOBILE - BAYAR SEMUA & EDIT REKAPAN
+
+PENTING: BACKUP folder project dan database sebelum update.
+
+1. Supabase Dashboard > SQL Editor > New Query.
+   Buka file supabase/payment-and-edit-migration.sql,
+   salin SELURUH isinya, klik Run. Jalankan pada project Supabase yang sudah dipakai.
+   JANGAN jalankan supabase/schema.sql (itu skema lama, bukan migrasi ini).
+2. Hentikan server Next.js (Ctrl+C).
+3. Ekstrak ZIP, salin isinya ke folder project; jangan menimpa .env.local.
+4. Jalankan npm install (jika perlu), lalu npm run dev.
+5. Owner/Admin: Rekap Pembayaran > BAYAR SEMUA (tagihan belum lunas semua tanggal).
+6. Owner/Admin: Edit Rekapan > pilih member dan tanggal > Tampilkan Transaksi > koreksi > Simpan.
+7. Member: Rekap Pembayaran menampilkan status hari ini hanya jika hak pembayaran > Rp0.
+
+PERHATIAN:
+- Bayar Semua hanya mencatat lunas, tidak mentransfer uang.
+- Tagihan hanya dibuat untuk penjualan dengan hak pembayaran > Rp0.
+- Setelah lunas, transaksi terkunci di database, bukan hanya di tampilan.
+- Pastikan seluruh transfer benar-benar dilakukan sebelum mengonfirmasi Bayar Semua.
+- Kode belum diuji terhadap Supabase live pengguna. Coba pada data uji dahulu.
