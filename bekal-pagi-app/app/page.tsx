@@ -80,12 +80,13 @@ export default function Dashboard() {
       if(profileError||!profile){setNotice('Profil akun belum terdaftar. Hubungi Owner.');setAuthReady(true);return;}
       const roleName=String(profile.role).charAt(0).toUpperCase()+String(profile.role).slice(1);
       if(alive){setRole(roleName as Role);}
-      const [mr,menuR,br,entryR,deliveryR,returnR,decisionR,settingR,profileR]=await Promise.all([
+      const [mr,menuR,br,entryR,deliveryR,onlineR,returnR,decisionR,settingR,profileR]=await Promise.all([
         supabase!.from('members').select('id,name,special_rate,special_rate_flat,active').eq('active',true).order('name'),
         supabase!.from('menus').select('id,member_id,name,active').eq('active',true).order('name'),
         supabase!.from('branches').select('id,name').eq('active',true),
         supabase!.from('daily_item_entries').select('id,business_date,member_id,menu_id,branch_id,channel,quantity'),
         supabase!.from('daily_member_deliveries').select('id,business_date,member_id,branch_id,quantity'),
+        supabase!.from('daily_member_online_orders').select('id,business_date,member_id,quantity'),
         supabase!.from('daily_returns').select('id,business_date,member_id,menu_id,branch_id,quantity'),
         supabase!.from('member_daily_decisions').select('business_date,member_id,decision'),
         supabase!.from('app_settings').select('regular_rate,bonus_rate,bonus_every').eq('id',true).single(),
@@ -107,9 +108,11 @@ export default function Dashboard() {
       const newDeliveries=(deliveryR.data||[]).map((x:any)=>({date:x.business_date,member:memberNames[x.member_id],product:'',branch:branchNames[x.branch_id],qty:Number(x.quantity)})).filter((x:any)=>x.member&&x.branch);
       const newKeys=new Set(newDeliveries.map((x:any)=>`${x.member}:${x.date}`));
       const legacy=(entryR.data||[]).map((x:any)=>({date:x.business_date,member:memberNames[x.member_id],product:menuNames[x.menu_id]||'',branch:x.channel==='online'?'Online':branchNames[x.branch_id],qty:Number(x.quantity)})).filter((x:any)=>x.member&&x.branch).filter((x:any)=>x.branch==='Online'||!newKeys.has(`${x.member}:${x.date}`));
-      const loadedEntries=[...newDeliveries,...legacy] as {date:string;member:string;product:string;branch:Branch|'Online';qty:number}[]; setIncomingHistory(loadedEntries);
+      const onlineDeliveries=(onlineR.data||[]).map((x:any)=>({date:x.business_date,member:memberNames[x.member_id],product:'',branch:'Online' as const,qty:Number(x.quantity)})).filter((x:any)=>x.member);
+      const loadedEntries=[...newDeliveries,...onlineDeliveries,...legacy] as {date:string;member:string;product:string;branch:Branch|'Online';qty:number}[]; setIncomingHistory(loadedEntries);
       const today=getLocalDateKey(); const todayBranch:Record<string,string>={};
       newDeliveries.filter((x:any)=>x.date===today).forEach((x:any)=>{const m=memberRows.find((v:any)=>v.name===x.member);if(m)todayBranch[`${m.id}:${x.branch}`]=String(x.qty);});
+      onlineDeliveries.filter((x:any)=>x.date===today).forEach((x:any)=>{const m=memberRows.find((v:any)=>v.name===x.member);if(m)todayBranch[`${m.id}:Online`]=String(x.qty);});
       setBranchDelivery(todayBranch);
       setReturns((returnR.data||[]).map((x:any,i:number)=>({id:i+1,date:x.business_date,member:memberNames[x.member_id],product:menuNames[x.menu_id],branch:branchNames[x.branch_id],qty:Number(x.quantity)})).filter((x:any)=>x.member&&x.product&&x.branch));
       setMemberDecisions(Object.fromEntries((decisionR.data||[]).map((x:any)=>[`${x.business_date}:${memberNames[x.member_id]}`,x.decision==='sedekahkan'?'Sedekahkan':'Ambil Nanti'])));
@@ -131,7 +134,7 @@ export default function Dashboard() {
     const values:Record<string,string>={};
     incomingHistory.filter(x=>x.date===todayKey&&x.product==='').forEach(x=>{
       const memberRow=members.find(v=>v.name===x.member);
-      if(memberRow&&x.branch!=='Online') values[`${memberRow.id}:${x.branch}`]=String(x.qty);
+      if(memberRow) values[`${memberRow.id}:${x.branch}`]=String(x.qty);
     });
     setBranchDelivery(values);
   },[todayKey,incomingHistory,members]);
@@ -147,8 +150,7 @@ export default function Dashboard() {
 
   const visibleMembers = members.filter(m => m.name.toLowerCase().includes(search.toLowerCase()) || m.products.some(p=>p.toLowerCase().includes(search.toLowerCase())));
   const visibleIncomingMembers = members.map(m=>({...m,products:m.products.filter(p=>!search.trim() || m.name.toLowerCase().includes(search.toLowerCase()) || p.toLowerCase().includes(search.toLowerCase()))})).filter(m=>m.products.length>0);
-  // Payment reports are derived ONLY from persisted Supabase history for today.
-  // Editable form state is deliberately excluded so prefill/UI state cannot be counted twice.
+  // Payment reports are derived ONLY from persisted Supabase history for today.  // Editable form state is deliberately excluded so prefill/UI state cannot be counted twice.
   const todayEntries = incomingHistory.filter(x=>x.date===todayKey);
   const totalReturns = returns.filter(r=>r.date===todayKey).reduce((a,r)=>a+r.qty,0);
   const totalDelivery = todayEntries.reduce((a,r)=>a+r.qty,0);
@@ -297,8 +299,7 @@ export default function Dashboard() {
         </div>
         <div className="panel table-panel"><div className="panel-head"><div><h3>Keputusan member atas barang kembali</h3><p>Satu keputusan untuk seluruh jumlah barang kembali milik masing-masing member. Reset otomatis setiap hari.</p></div></div><div className="decision-owner-list">{members.map(m=><div className="decision-owner-row" key={m.id}><div><b>{m.name}</b><small>{returns.filter(r=>r.member===m.name).reduce((sum,r)=>sum+r.qty,0)} porsi kembali · keputusan untuk seluruh menu</small></div><span className={`decision-status ${getMemberDecision(m.name)==='Sedekahkan'?'donate':getMemberDecision(m.name)==='Ambil Nanti'?'pickup':'pending'}`}>{getMemberDecision(m.name)}</span></div>)}</div></div>
         <div className="panel table-panel"><div className="panel-head"><div><h3>Aktivitas member</h3><p>Ringkasan barang masuk dan kembali</p></div><button className="text-button" onClick={()=>setPage('Laporan')}>Lihat laporan <ArrowUpRight size={15}/></button></div><MemberTable rows={memberStats.slice(0,5)} showMoney={false}/></div>
-      </>}
-      {page==='Dashboard'&&role==='Admin'&&<>
+      </>}      {page==='Dashboard'&&role==='Admin'&&<>
         <div className="welcome-row"><div><h2>Dashboard Admin</h2><p>Kelola pencatatan barang dan data member hari ini.</p></div><div className="date-pill">3 November 2026</div></div>
         <div className="stats-grid">
           <Stat icon={<Users/>} label="Member aktif" value={`${members.length}`} sub="Daftar member Bekal Pagi"/>
@@ -321,7 +322,36 @@ export default function Dashboard() {
       </>}
       {page==='Dashboard'&&role==='Member'&&memberLinked&&<div className="member-home"><div className="member-greeting"><div><span>HALO, MEMBER BEKAL PAGI</span><h2>{member} 👋</h2><p>Ini ringkasan barang dan pembayaran kamu hari ini.</p></div><div className="member-date">{new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div></div><MemberPortal name={member} returns={returns.filter(r=>r.member===member)} stats={memberStats.find(m=>m.name===member)!} members={members} incomingHistory={incomingHistory.filter(r=>r.member===member)} allReturns={returns.filter(r=>r.member===member)} unitRate={unitRate} bonusRate={bonusRate} bonusEvery={bonusEvery} specialTariffs={specialTariffs} decision={getMemberDecision(member)} setDecision={(value:any)=>saveMemberDecision(member,value)}/></div>}
 
-      {page==='Input Barang Masuk'&&<div className="panel"><div className="panel-head"><div><h3>Input barang masuk per member & cabang</h3><p>Catat total barang yang dibawa setiap member ke masing-masing cabang.</p></div><span className="tag">Owner / Admin</span></div><div className="search-box"><Search size={17}/><input placeholder="Cari nama member..." value={search} onChange={e=>setSearch(e.target.value)}/>{search&&<button type="button" className="search-clear" onClick={()=>setSearch('')} aria-label="Hapus pencarian">×</button>}</div><div className="helper">Satu baris untuk satu member. Isi jumlah total per cabang, bukan per menu. Rincian menu tetap dicatat saat input barang kembali.</div><div className="menu-incoming-list"><div className="menu-incoming-head"><span>Nama member</span>{branches.map(b=><span key={b}>{b}</span>)}<span>Total</span></div>{visibleIncomingMembers.map(m=><div className="menu-incoming-row" key={m.id}><b>{m.name}</b>{branches.map(b=><input key={b} aria-label={`${m.name} ${b}`} type="number" min="0" step="1" placeholder="0" value={branchDelivery[`${m.id}:${b}`]||''} onChange={e=>setBranchDelivery(d=>({...d,[`${m.id}:${b}`]:e.target.value}))}/>)}<strong>{branches.reduce((sum,b)=>sum+(Number(branchDelivery[`${m.id}:${b}`])||0),0)}</strong></div>)}</div><div className="helper">Total bawaan: <b>{members.reduce((sum,m)=>sum+branches.reduce((v,b)=>v+(Number(branchDelivery[`${m.id}:${b}`])||0),0),0)} porsi</b>.</div><button className="primary-btn" onClick={async()=>{const date=getLocalDateKey();if(!supabase){setNotice('Supabase belum terkonfigurasi.');return;}const rows=members.flatMap(m=>branches.map(b=>({business_date:date,member_id:dbMemberIds[m.name],branch_id:dbBranchIds[b],quantity:Number(branchDelivery[`${m.id}:${b}`])||0}))).filter(x=>x.member_id&&x.branch_id);if(!rows.some(x=>x.quantity>0)){setNotice('Isi minimal satu jumlah barang sebelum menyimpan.');return;}const {error:delError}=await supabase!.from('daily_member_deliveries').delete().eq('business_date',date);if(delError){setNotice('Gagal memperbarui bawaan: '+delError.message+' — jalankan migrasi SQL terlebih dahulu.');return;}const {error}=await supabase!.from('daily_member_deliveries').insert(rows.filter(x=>x.quantity>0));if(error){setNotice('Gagal menyimpan bawaan: '+error.message);return;}const {data:deliveryData,error:refreshError}=await supabase!.from('daily_member_deliveries').select('business_date,member_id,branch_id,quantity');if(refreshError){setNotice('Bawaan tersimpan tetapi gagal memuat ulang: '+refreshError.message);return;}const names=Object.fromEntries(Object.entries(dbMemberIds).map(([n,id])=>[id,n]));const br=Object.fromEntries(Object.entries(dbBranchIds).map(([n,id])=>[id,n]));const newRows=(deliveryData||[]).map((x:any)=>({date:x.business_date,member:names[x.member_id],product:'',branch:br[x.branch_id] as Branch,qty:Number(x.quantity)})).filter((x:any)=>x.member&&x.branch);const oldRows=incomingHistory.filter(x=>x.branch==='Online'||(x.product!==''&&!newRows.some(n=>n.member===x.member&&n.date===x.date)));setIncomingHistory([...oldRows,...newRows]);setNotice('Barang masuk per member dan cabang berhasil disimpan.');}}>Simpan / Perbarui barang masuk</button></div>}
+      {page==='Input Barang Masuk'&&<div className="panel"><div className="panel-head"><div><h3>Input barang masuk per member & cabang</h3><p>Catat total barang yang dibawa setiap member ke masing-masing cabang.</p></div><span className="tag">Owner / Admin</span></div><div className="search-box"><Search size={17}/><input placeholder="Cari nama member..." value={search} onChange={e=>setSearch(e.target.value)}/>{search&&<button type="button" className="search-clear" onClick={()=>setSearch('')} aria-label="Hapus pencarian">×</button>}</div><div className="helper">Satu baris untuk satu member. Isi jumlah total per cabang, bukan per menu. Rincian menu tetap dicatat saat input barang kembali.</div><div className="menu-incoming-list"><div className="menu-incoming-head"><span>Nama member</span>{branches.map(b=><span key={b}>{b}</span>)}<span>Online</span><span>Total</span></div>{visibleIncomingMembers.map(m=><div className="menu-incoming-row" key={m.id}><b>{m.name}</b>{branches.map(b=><input key={b} aria-label={`${m.name} ${b}`} type="number" min="0" step="1" placeholder="0" value={branchDelivery[`${m.id}:${b}`]||''} onChange={e=>setBranchDelivery(d=>({...d,[`${m.id}:${b}`]:e.target.value}))}/>)}<input aria-label={`${m.name} Online`} type="number" min="0" step="1" placeholder="0" value={branchDelivery[`${m.id}:Online`]||''} onChange={e=>setBranchDelivery(d=>({...d,[`${m.id}:Online`]:e.target.value}))}/><strong>{branches.reduce((sum,b)=>sum+(Number(branchDelivery[`${m.id}:${b}`])||0),0)+(Number(branchDelivery[`${m.id}:Online`])||0)}</strong></div>)}</div><div className="helper">Total bawaan: <b>{members.reduce((sum,m)=>sum+branches.reduce((v,b)=>v+(Number(branchDelivery[`${m.id}:${b}`])||0),0)+(Number(branchDelivery[`${m.id}:Online`])||0),0)} porsi</b>.</div><button className="primary-btn" onClick={async()=>{
+  const date=getLocalDateKey();
+  if(!supabase){setNotice('Supabase belum terkonfigurasi.');return;}
+  const memberIds=members.map(m=>dbMemberIds[m.name]).filter(Boolean);
+  const branchRows=members.flatMap(m=>branches.map(b=>({business_date:date,member_id:dbMemberIds[m.name],branch_id:dbBranchIds[b],quantity:Number(branchDelivery[`${m.id}:${b}`])||0}))).filter(x=>x.member_id&&x.branch_id);
+  const onlineRows=members.map(m=>({business_date:date,member_id:dbMemberIds[m.name],quantity:Number(branchDelivery[`${m.id}:Online`])||0})).filter(x=>x.member_id);
+  if(!branchRows.some(x=>x.quantity>0)&&!onlineRows.some(x=>x.quantity>0)){setNotice('Isi minimal satu jumlah barang sebelum menyimpan.');return;}
+  const [branchDelete,onlineDelete]=await Promise.all([
+    supabase!.from('daily_member_deliveries').delete().eq('business_date',date).in('member_id',memberIds),
+    supabase!.from('daily_member_online_orders').delete().eq('business_date',date).in('member_id',memberIds)
+  ]);
+  if(branchDelete.error||onlineDelete.error){setNotice('Gagal memperbarui bawaan: '+(branchDelete.error||onlineDelete.error)?.message);return;}
+  const [branchInsert,onlineInsert]=await Promise.all([
+    supabase!.from('daily_member_deliveries').insert(branchRows.filter(x=>x.quantity>0)),
+    supabase!.from('daily_member_online_orders').insert(onlineRows.filter(x=>x.quantity>0))
+  ]);
+  if(branchInsert.error||onlineInsert.error){setNotice('Gagal menyimpan bawaan: '+(branchInsert.error||onlineInsert.error)?.message);return;}
+  const [deliveryData,onlineData]=await Promise.all([
+    supabase!.from('daily_member_deliveries').select('business_date,member_id,branch_id,quantity'),
+    supabase!.from('daily_member_online_orders').select('business_date,member_id,quantity')
+  ]);
+  if(deliveryData.error||onlineData.error){setNotice('Bawaan tersimpan tetapi gagal memuat ulang: '+(deliveryData.error||onlineData.error)?.message);return;}
+  const names=Object.fromEntries(Object.entries(dbMemberIds).map(([n,id])=>[id,n]));
+  const br=Object.fromEntries(Object.entries(dbBranchIds).map(([n,id])=>[id,n]));
+  const newRows=(deliveryData.data||[]).map((x:any)=>({date:x.business_date,member:names[x.member_id],product:'',branch:br[x.branch_id] as Branch,qty:Number(x.quantity)})).filter((x:any)=>x.member&&x.branch);
+  const onlineHistory=(onlineData.data||[]).map((x:any)=>({date:x.business_date,member:names[x.member_id],product:'',branch:'Online' as const,qty:Number(x.quantity)})).filter((x:any)=>x.member);
+  const oldRows=incomingHistory.filter(x=>x.product!==''&&!newRows.some(n=>n.member===x.member&&n.date===x.date));
+  setIncomingHistory([...oldRows,...newRows,...onlineHistory]);
+  setNotice('Barang masuk cabang dan Online berhasil disimpan.');
+}}>Simpan / Perbarui barang masuk</button></div>}
       {page==='Input Barang Kembali'&&<div className="panel"><div className="panel-head"><div><h3>{role==='Staff'?'Input barang kembali':'Input barang kembali per member & menu'}</h3><p>{role==='Staff'?'Pilih cabang tempat kamu bertugas, lalu isi jumlah barang yang kembali.':'Isi jumlah retur untuk 4 cabang sekaligus, dikelompokkan berdasarkan pemilik menu.'}</p></div><span className="tag">{role==='Staff'?'Staff':'Owner / Admin'}</span></div>{role==='Staff'&&<div className="staff-branch-picker"><label htmlFor="staff-return-branch">PILIH CABANG</label><select id="staff-return-branch" value={branch} onChange={e=>{setBranch(e.target.value as Branch);setReturnQty({});setNotice('')}}>{branches.map(b=><option key={b} value={b}>{b}</option>)}</select><p>Pastikan cabang sudah benar sebelum memasukkan jumlah barang kembali.</p></div>}<div className="search-box"><Search size={17}/><input placeholder="Cari nama member atau menu..." value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="helper"><b>{role==='Staff'?`Daftar menu untuk retur cabang ${branch}`:'Daftar menu seluruh member'}</b><br/>{role==='Staff'?'Isi jumlah barang yang benar-benar kembali di cabang yang dipilih. Menu lain tidak perlu diisi jika tidak ada retur.':'Setiap menu terhubung dengan pemiliknya. Isi jumlah barang kembali di cabang terkait; kosongkan atau isi 0 jika tidak ada retur.'}</div><div className="return-branch-grid">{role==='Staff'?<><div className="return-branch-head staff-return-head"><span>Member & menu</span><span>{branch}</span></div>{visibleMembers.map(m=><section className="return-member-group" key={m.id}><div className="return-member-title">{m.name}</div>{m.products.map(p=><div className="return-branch-line staff-return-line" key={`${m.id}:${p}`}><div className="return-product-name"><b>{p}</b></div><input aria-label={`${m.name} ${p} ${branch}`} type="number" min="0" placeholder="0" value={returnQty[`${m.id}:${p}:${branch}`]||''} onChange={e=>setReturnQty(q=>({...q,[`${m.id}:${p}:${branch}`]:e.target.value}))}/></div>)}</section>)}</>:<><div className="return-branch-head"><span>Member & menu</span>{branches.map(b=><span key={b}>{b}</span>)}</div>{visibleMembers.map(m=><section className="return-member-group" key={m.id}><div className="return-member-title">{m.name}</div>{m.products.map(p=><div className="return-branch-line" key={`${m.id}:${p}`}><div className="return-product-name"><b>{p}</b></div>{branches.map(b=><input key={b} aria-label={`${m.name} ${p} ${b}`} type="number" min="0" placeholder="0" value={returnQty[`${m.id}:${p}:${b}`]||''} onChange={e=>setReturnQty(q=>({...q,[`${m.id}:${p}:${b}`]:e.target.value}))}/>)}</div>)}</section>)}</>}</div><div className="return-total"><span>{role==='Staff'?`Total barang kembali cabang ${branch}`:'Total barang kembali seluruh cabang'}</span><b>{members.reduce((a,m)=>a+m.products.reduce((sum,p)=>sum+(role==='Staff'?(Number(returnQty[`${m.id}:${p}:${branch}`])||0):branches.reduce((v,b)=>v+(Number(returnQty[`${m.id}:${p}:${b}`])||0),0)),0),0)} porsi</b></div><button className="primary-btn" onClick={submitReturns}>Konfirmasi barang kembali</button></div>}
       {page==='Monitoring Member'&&role==='Owner'&&(()=>{
         const selected=members.find(m=>m.id===monitorMemberId)||members[0];
