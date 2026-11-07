@@ -137,6 +137,8 @@ export default function Dashboard() {
   },[router]);
 
   useEffect(()=>{
+    // Sinkronkan segera setelah hydration agar tanggal SSR Cloudflare tidak tertinggal.
+    setTodayKey(getLocalDateKey());
     const timer = setInterval(()=>setTodayKey(getLocalDateKey()),30000);
     return ()=>clearInterval(timer);
   },[]);
