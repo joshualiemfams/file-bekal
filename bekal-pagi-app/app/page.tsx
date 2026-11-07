@@ -293,6 +293,17 @@ export default function Dashboard() {
           <Stat icon={<ArrowUpRight/>} label="Barang kembali" value={`${totalReturns} porsi`} sub="Gabungan 4 cabang"/>
           <Stat icon={<Activity/>} label="Estimasi terjual" value={`${totalDelivery-totalReturns} porsi`} sub="Masuk dikurangi retur"/>
         </div>
+        <div className="panel" style={{marginBottom:16}}>
+          <div className="panel-head"><div><h3>Ringkasan Penjualan per Cabang</h3><p>Perhitungan berdasarkan barang masuk dikurangi barang kembali. Harga jual Rp10.000 per porsi.</p></div></div>
+          <div className="table-wrap"><table><thead><tr><th>Cabang</th><th>Bawa</th><th>Sisa</th><th>Laku</th><th>Omzet</th></tr></thead><tbody>
+            {branches.map(b=>{const brought=incomingHistory.filter(x=>x.date===todayKey&&x.branch===b).reduce((a,x)=>a+x.qty,0);const back=returns.filter(x=>x.date===todayKey&&x.branch===b).reduce((a,x)=>a+x.qty,0);const sold=brought-back;return <tr key={b}><td><b>{b}</b></td><td>{brought.toLocaleString('id-ID')}</td><td>{back.toLocaleString('id-ID')}</td><td>{sold.toLocaleString('id-ID')}</td><td><b>{idr(sold*10000)}</b></td></tr>;})}
+          </tbody></table></div>
+          <div className="summary-total"><b>Total Keseluruhan Cabang</b><strong>{idr(branches.reduce((sum,b)=>{const brought=incomingHistory.filter(x=>x.date===todayKey&&x.branch===b).reduce((a,x)=>a+x.qty,0);const back=returns.filter(x=>x.date===todayKey&&x.branch===b).reduce((a,x)=>a+x.qty,0);return sum+(brought-back)*10000;},0))}</strong></div>
+        </div>
+        <div className="panel" style={{marginBottom:20}}>
+          <div className="panel-head"><div><h3>Penjualan Online</h3><p>Terpisah dari omzet empat cabang.</p></div></div>
+          {(()=>{const brought=incomingHistory.filter(x=>x.date===todayKey&&x.branch==='Online').reduce((a,x)=>a+x.qty,0);return <div className="summary-total"><span>Terjual Online: <b>{brought.toLocaleString('id-ID')} porsi</b></span><strong>{idr(brought*10000)}</strong></div>;})()}
+        </div>
         <div className="content-grid">
           <div className="panel"><div className="panel-head"><div><h3>Retur berdasarkan cabang</h3><p>Jumlah barang kembali hari ini</p></div><button className="text-button" onClick={()=>setPage('Input Barang Kembali')}>Input retur <ArrowUpRight size={15}/></button></div><div className="branch-list">{branches.map(b=><div className="branch-row" key={b}><div className="branch-icon"><Store size={18}/></div><div className="branch-name"><b>{b}</b><small>{returns.filter(r=>r.branch===b).length} catatan menu</small></div><strong>{returns.filter(r=>r.branch===b).reduce((a,r)=>a+r.qty,0)} <small>porsi</small></strong></div>)}</div></div>
           <div className="panel"><div className="panel-head"><div><h3>Ringkasan pembayaran</h3><p>Hak member dan kewajiban perusahaan</p></div><CircleDollarSign size={20} className="muted-icon"/></div><div className="money-total">{idr(memberStats.reduce((a,m)=>a+m.earned,0))}</div><div className="money-foot"><span>Total hak seluruh member</span><b>{idr(memberStats.reduce((a,m)=>a+m.earned,0))}</b></div><button className="outline-button full" onClick={()=>setPage('Rekap Pembayaran')}>Lihat rekap pembayaran</button></div>
