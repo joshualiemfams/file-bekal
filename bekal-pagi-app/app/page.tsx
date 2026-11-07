@@ -90,8 +90,8 @@ export default function Dashboard() {
       if(profileError||!profile){setNotice('Profil akun belum terdaftar. Hubungi Owner.');setAuthReady(true);return;}
       const roleName=String(profile.role).charAt(0).toUpperCase()+String(profile.role).slice(1);
       if(alive){setRole(roleName as Role);}
-      const [mr,menuR,br,entryR,deliveryR,onlineR,returnR,decisionR,settingR,profileR]=await Promise.all([
-        supabase!.from('members').select('id,name,special_rate,special_rate_flat,active').eq('active',true).order('name'),
+      const [mr,menuR,br,entryR,deliveryR,onlineR,returnR,decisionR,settingR,tariffR,profileR]=await Promise.all([
+        supabase!.from('members').select('id,name,active').eq('active',true).order('name'),
         supabase!.from('menus').select('id,member_id,name,active').eq('active',true).order('name'),
         supabase!.from('branches').select('id,name').eq('active',true),
         supabase!.from('daily_item_entries').select('id,business_date,member_id,menu_id,branch_id,channel,quantity'),
@@ -99,7 +99,8 @@ export default function Dashboard() {
         supabase!.from('daily_member_online_orders').select('id,business_date,member_id,quantity'),
         supabase!.from('daily_returns').select('id,business_date,member_id,menu_id,branch_id,quantity'),
         supabase!.from('member_daily_decisions').select('business_date,member_id,decision'),
-        supabase!.from('app_settings').select('regular_rate,bonus_rate,bonus_every').eq('id',true).single(),
+        supabase!.rpc('get_app_settings_for_role'),
+        supabase!.rpc('get_member_tariffs'),
         roleName==='Owner' ? supabase!.from('profiles').select('user_id,full_name,email').eq('role','member').is('member_id',null).order('full_name') : Promise.resolve({data:[],error:null})
       ]);
       if(!alive)return;
@@ -114,7 +115,7 @@ export default function Dashboard() {
       setMembers(memberRows.map((m:any)=>({id:m.id,name:m.name,products:menuRows.filter((x:any)=>x.member_id===m.id).map((x:any)=>x.name)})));
       if(profile.member_id){const linked=memberRows.find((m:any)=>m.id===profile.member_id);if(linked)setMember(linked.name);if(roleName==='Member')setMemberLinked(true);}
       if(roleName==='Member'&&!profile.member_id){setNotice('Akun kamu belum dihubungkan ke data member. Hubungi Owner Bekal Pagi.');}
-      const special:Record<string,number>={};memberRows.forEach((m:any)=>{if(m.special_rate!==null)special[m.name]=Number(m.special_rate);});setSpecialTariffs(special);
+      const special:Record<string,number>={};(tariffR.data||[]).forEach((t:any)=>{const m=memberRows.find((v:any)=>v.id===t.member_id);if(m&&t.special_rate!==null)special[m.name]=Number(t.special_rate);});setSpecialTariffs(special);
       const newDeliveries=(deliveryR.data||[]).map((x:any)=>({date:String(x.business_date).slice(0,10),member:memberNames[x.member_id],product:'',branch:branchNames[x.branch_id],qty:Number(x.quantity)})).filter((x:any)=>x.member&&x.branch);
       const newKeys=new Set(newDeliveries.map((x:any)=>`${x.member}:${x.date}`));
       const legacy=(entryR.data||[]).map((x:any)=>({date:String(x.business_date).slice(0,10),member:memberNames[x.member_id],product:menuNames[x.menu_id]||'',branch:x.channel==='online'?'Online':branchNames[x.branch_id],qty:Number(x.quantity)})).filter((x:any)=>x.member&&x.branch).filter((x:any)=>x.branch==='Online'||!newKeys.has(`${x.member}:${x.date}`));
@@ -126,7 +127,7 @@ export default function Dashboard() {
       setBranchDelivery(todayBranch);
       setReturns((returnR.data||[]).map((x:any,i:number)=>({id:i+1,date:String(x.business_date).slice(0,10),member:memberNames[x.member_id],product:menuNames[x.menu_id],branch:branchNames[x.branch_id],qty:Number(x.quantity)})).filter((x:any)=>x.member&&x.product&&x.branch));
       setMemberDecisions(Object.fromEntries((decisionR.data||[]).map((x:any)=>[`${String(x.business_date).slice(0,10)}:${memberNames[x.member_id]}`,x.decision==='sedekahkan'?'Sedekahkan':'Ambil Nanti'])));
-      if(settingR.data){setUnitRate(String(settingR.data.regular_rate));setBonusRate(String(settingR.data.bonus_rate));setBonusEvery(String(settingR.data.bonus_every));}
+      const settingRow=Array.isArray(settingR.data)?settingR.data[0]:settingR.data;if(settingRow&&settingRow.regular_rate!==null){setUnitRate(String(settingRow.regular_rate));setBonusRate(String(settingRow.bonus_rate));setBonusEvery(String(settingRow.bonus_every));}
       let payQuery=supabase!.from('member_payments').select('member_id,business_date,amount,paid_at');
       if(roleName==='Admin')payQuery=payQuery.eq('business_date',getLocalDateKey());
       const payR=await payQuery;
@@ -423,14 +424,14 @@ export default function Dashboard() {
   const rate=Math.max(0,Number(specialRate)||0);
   const memberId=dbMemberIds[specialMember];
   if(!memberId){setNotice(`Gagal: ID ${specialMember} tidak ditemukan.`);return;}
-  const {error}=await supabase!.from('members').update({special_rate:rate}).eq('id',memberId);
+  const {error}=await supabase!.rpc('set_member_special_rate',{p_member_id:memberId,p_rate:rate});
   if(error){setNotice(`Gagal menyimpan tarif ${specialMember}: ${error.message}`);return;}
   setSpecialTariffs(prev=>({...prev,[specialMember]:rate}));
   setNotice(`Tarif khusus ${specialMember} tersimpan permanen: ${idr(rate)} per item, tanpa bonus.`);
 }}>Terapkan tarif khusus</button><button className="outline-button" onClick={async()=>{
   const memberId=dbMemberIds[specialMember];
   if(!memberId){setNotice(`Gagal: ID ${specialMember} tidak ditemukan.`);return;}
-  const {error}=await supabase!.from('members').update({special_rate:null}).eq('id',memberId);
+  const {error}=await supabase!.rpc('set_member_special_rate',{p_member_id:memberId,p_rate:null});
   if(error){setNotice(`Gagal menghapus tarif ${specialMember}: ${error.message}`);return;}
   setSpecialTariffs(prev=>{const next={...prev};delete next[specialMember];return next});
   setNotice(`Tarif khusus ${specialMember} dihapus dari database. Member kembali menggunakan tarif umum dan bonus.`);
