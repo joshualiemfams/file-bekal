@@ -112,17 +112,17 @@ export default function Dashboard() {
       if(profile.member_id){const linked=memberRows.find((m:any)=>m.id===profile.member_id);if(linked)setMember(linked.name);if(roleName==='Member')setMemberLinked(true);}
       if(roleName==='Member'&&!profile.member_id){setNotice('Akun kamu belum dihubungkan ke data member. Hubungi Owner Bekal Pagi.');}
       const special:Record<string,number>={};memberRows.forEach((m:any)=>{if(m.special_rate!==null)special[m.name]=Number(m.special_rate);});setSpecialTariffs(special);
-      const newDeliveries=(deliveryR.data||[]).map((x:any)=>({date:x.business_date,member:memberNames[x.member_id],product:'',branch:branchNames[x.branch_id],qty:Number(x.quantity)})).filter((x:any)=>x.member&&x.branch);
+      const newDeliveries=(deliveryR.data||[]).map((x:any)=>({date:String(x.business_date).slice(0,10),member:memberNames[x.member_id],product:'',branch:branchNames[x.branch_id],qty:Number(x.quantity)})).filter((x:any)=>x.member&&x.branch);
       const newKeys=new Set(newDeliveries.map((x:any)=>`${x.member}:${x.date}`));
-      const legacy=(entryR.data||[]).map((x:any)=>({date:x.business_date,member:memberNames[x.member_id],product:menuNames[x.menu_id]||'',branch:x.channel==='online'?'Online':branchNames[x.branch_id],qty:Number(x.quantity)})).filter((x:any)=>x.member&&x.branch).filter((x:any)=>x.branch==='Online'||!newKeys.has(`${x.member}:${x.date}`));
-      const onlineDeliveries=(onlineR.data||[]).map((x:any)=>({date:x.business_date,member:memberNames[x.member_id],product:'',branch:'Online' as const,qty:Number(x.quantity)})).filter((x:any)=>x.member);
+      const legacy=(entryR.data||[]).map((x:any)=>({date:String(x.business_date).slice(0,10),member:memberNames[x.member_id],product:menuNames[x.menu_id]||'',branch:x.channel==='online'?'Online':branchNames[x.branch_id],qty:Number(x.quantity)})).filter((x:any)=>x.member&&x.branch).filter((x:any)=>x.branch==='Online'||!newKeys.has(`${x.member}:${x.date}`));
+      const onlineDeliveries=(onlineR.data||[]).map((x:any)=>({date:String(x.business_date).slice(0,10),member:memberNames[x.member_id],product:'',branch:'Online' as const,qty:Number(x.quantity)})).filter((x:any)=>x.member);
       const loadedEntries=[...newDeliveries,...onlineDeliveries,...legacy] as {date:string;member:string;product:string;branch:Branch|'Online';qty:number}[]; setIncomingHistory(loadedEntries);
       const today=getLocalDateKey(); const todayBranch:Record<string,string>={};
       newDeliveries.filter((x:any)=>x.date===today).forEach((x:any)=>{const m=memberRows.find((v:any)=>v.name===x.member);if(m)todayBranch[`${m.id}:${x.branch}`]=String(x.qty);});
       onlineDeliveries.filter((x:any)=>x.date===today).forEach((x:any)=>{const m=memberRows.find((v:any)=>v.name===x.member);if(m)todayBranch[`${m.id}:Online`]=String(x.qty);});
       setBranchDelivery(todayBranch);
-      setReturns((returnR.data||[]).map((x:any,i:number)=>({id:i+1,date:x.business_date,member:memberNames[x.member_id],product:menuNames[x.menu_id],branch:branchNames[x.branch_id],qty:Number(x.quantity)})).filter((x:any)=>x.member&&x.product&&x.branch));
-      setMemberDecisions(Object.fromEntries((decisionR.data||[]).map((x:any)=>[`${x.business_date}:${memberNames[x.member_id]}`,x.decision==='sedekahkan'?'Sedekahkan':'Ambil Nanti'])));
+      setReturns((returnR.data||[]).map((x:any,i:number)=>({id:i+1,date:String(x.business_date).slice(0,10),member:memberNames[x.member_id],product:menuNames[x.menu_id],branch:branchNames[x.branch_id],qty:Number(x.quantity)})).filter((x:any)=>x.member&&x.product&&x.branch));
+      setMemberDecisions(Object.fromEntries((decisionR.data||[]).map((x:any)=>[`${String(x.business_date).slice(0,10)}:${memberNames[x.member_id]}`,x.decision==='sedekahkan'?'Sedekahkan':'Ambil Nanti'])));
       if(settingR.data){setUnitRate(String(settingR.data.regular_rate));setBonusRate(String(settingR.data.bonus_rate));setBonusEvery(String(settingR.data.bonus_every));}
       const payR=await supabase!.from('member_payments').select('member_id,business_date,amount,paid_at');
       if(payR.error){setPaymentReady(false);setNotice('Fitur pembayaran belum aktif. Jalankan supabase/payment-and-edit-migration.sql dahulu: '+payR.error.message);}
