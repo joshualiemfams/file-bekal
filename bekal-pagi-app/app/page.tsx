@@ -213,7 +213,7 @@ export default function Dashboard() {
     if(role!=='Owner'||!paymentReady||paymentBusy||!outstanding.length)return;
     if(!window.confirm(`Tandai lunas ${outstanding.length} tagihan dari ${new Set(outstanding.map(x=>x.memberId)).size} member?\nPerkiraan total: ${idr(outstandingTotal)}\nPastikan uang benar-benar sudah ditransfer.`))return;
     setPaymentBusy(true);
-    const {data,error}=await supabase!.rpc('pay_all_outstanding');
+    const {data,error}=await supabase!.rpc('pay_all_outstanding_owner');
     if(error)setNotice('Gagal bayar semua: '+error.message);
     else {await refreshPayments();const result=Array.isArray(data)?data[0]:data;setNotice(`Berhasil mencatat ${result?.payment_count||0} tagihan lunas, total ${idr(Number(result?.total_amount||0))}.`);}
     setPaymentBusy(false);
