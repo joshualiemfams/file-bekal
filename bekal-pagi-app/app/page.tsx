@@ -294,7 +294,7 @@ export default function Dashboard() {
       {notice&&<div className="notice"><Check size={17}/><span>{notice}</span><button onClick={()=>setNotice('')}><X size={16}/></button></div>}
       {role==='Member'&&!memberLinked&&<div className="panel pending-link-notice"><h2>Akun menunggu dihubungkan</h2><p>Akun kamu sudah terdaftar, tetapi Owner belum memasangkannya dengan data member Bekal Pagi. Data transaksi belum ditampilkan agar tidak tertukar dengan member lain.</p><button className="outline-button" onClick={async()=>{await supabase?.auth.signOut();router.replace('/login')}}>Keluar</button></div>}
       {page==='Dashboard'&&role==='Owner'&&<>
-        <div className="welcome-row"><div><h2>Selamat datang, Owner!</h2><p>Pantau seluruh operasional dan kewajiban pembayaran Bekal Pagi.</p></div><div className="date-pill">3 November 2026</div></div>
+        <div className="welcome-row"><div><h2>Selamat datang, Owner!</h2><p>Pantau seluruh operasional dan kewajiban pembayaran Bekal Pagi.</p></div><div className="date-pill">{new Date(`${todayKey}T00:00:00+08:00`).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric',timeZone:'Asia/Makassar'})}</div></div>
         <div className="stats-grid">
           <Stat icon={<Users/>} label="Member terdaftar" value={`${members.length}`} sub="Seluruh member aktif"/>
           <Stat icon={<Package/>} label="Barang masuk" value={`${totalDelivery} porsi`} sub="Total input hari ini"/>
