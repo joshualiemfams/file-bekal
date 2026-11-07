@@ -2,7 +2,25 @@
   "name": "bekal-pagi-management",
   "version": "0.1.0",
   "private": true,
-  "scripts": {"dev":"next dev", "build":"next build", "start":"next start", "lint":"next lint"},
-  "dependencies": {"@supabase/supabase-js":"^2.57.0", "lucide-react":"^0.468.0", "next":"^15.5.0", "react":"^19.1.0", "react-dom":"^19.1.0"},
-  "devDependencies": {"@types/node":"^22.0.0", "@types/react":"^19.0.0", "@types/react-dom":"^19.0.0", "typescript":"^5.8.0"}
+  "scripts": {
+    "dev": "next dev",
+    "build": "opennextjs-cloudflare build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@opennextjs/cloudflare": "^1.20.16",
+    "@supabase/supabase-js": "^2.57.0",
+    "lucide-react": "^0.468.0",
+    "next": "^15.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.8.0",
+    "wrangler": "^4.158.0"
+  }
 }
