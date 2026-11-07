@@ -9,8 +9,15 @@ type Role = 'Owner' | 'Admin' | 'Staff' | 'Member';
 type Branch = 'Pejanggik' | 'Jempong' | 'Ampenan' | 'Abian Tubuh';
 const branches: Branch[] = ['Pejanggik','Jempong','Ampenan','Abian Tubuh'];
 const getLocalDateKey = () => {
-  // Gunakan tanggal operasional Lombok (WITA), bukan timezone perangkat/browser.
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Makassar', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  // Bentuk YYYY-MM-DD secara eksplisit berdasarkan zona waktu operasional Lombok (WITA).
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Makassar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+  const part = (type: string) => parts.find(item => item.type === type)?.value || '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
 };
 const initialMembers = [
   {id:'m1',name:'Wiwit',products:['Ayam Madu','Risol','Nasi Bakar']},
