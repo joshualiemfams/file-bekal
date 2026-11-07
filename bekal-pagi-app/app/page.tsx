@@ -19,6 +19,9 @@ const getLocalDateKey = () => {
   const part = (type: string) => parts.find(item => item.type === type)?.value || '';
   return `${part('year')}-${part('month')}-${part('day')}`;
 };
+const formatLocalDateKey = (dateKey: string) => new Intl.DateTimeFormat('id-ID', {
+  timeZone: 'Asia/Makassar', day: 'numeric', month: 'long', year: 'numeric'
+}).format(new Date(`${dateKey}T00:00:00+08:00`));
 const initialMembers = [
   {id:'m1',name:'Wiwit',products:['Ayam Madu','Risol','Nasi Bakar']},
   {id:'m2',name:'Rina',products:['Pastel','Donat Kentang']},
@@ -294,7 +297,7 @@ export default function Dashboard() {
       {notice&&<div className="notice"><Check size={17}/><span>{notice}</span><button onClick={()=>setNotice('')}><X size={16}/></button></div>}
       {role==='Member'&&!memberLinked&&<div className="panel pending-link-notice"><h2>Akun menunggu dihubungkan</h2><p>Akun kamu sudah terdaftar, tetapi Owner belum memasangkannya dengan data member Bekal Pagi. Data transaksi belum ditampilkan agar tidak tertukar dengan member lain.</p><button className="outline-button" onClick={async()=>{await supabase?.auth.signOut();router.replace('/login')}}>Keluar</button></div>}
       {page==='Dashboard'&&role==='Owner'&&<>
-        <div className="welcome-row"><div><h2>Selamat datang, Owner!</h2><p>Pantau seluruh operasional dan kewajiban pembayaran Bekal Pagi.</p></div><div className="date-pill">{new Date(`${todayKey}T00:00:00+08:00`).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric',timeZone:'Asia/Makassar'})}</div></div>
+        <div className="welcome-row"><div><h2>Selamat datang, Owner!</h2><p>Pantau seluruh operasional dan kewajiban pembayaran Bekal Pagi.</p></div><div className="date-pill">{formatLocalDateKey(todayKey)}</div></div>
         <div className="stats-grid">
           <Stat icon={<Users/>} label="Member terdaftar" value={`${members.length}`} sub="Seluruh member aktif"/>
           <Stat icon={<Package/>} label="Barang masuk" value={`${totalDelivery} porsi`} sub="Total input hari ini"/>
@@ -308,7 +311,7 @@ export default function Dashboard() {
         <div className="panel table-panel"><div className="panel-head"><div><h3>Keputusan member atas barang kembali</h3><p>Satu keputusan untuk seluruh jumlah barang kembali milik masing-masing member. Reset otomatis setiap hari.</p></div></div><div className="decision-owner-list">{members.map(m=><div className="decision-owner-row" key={m.id}><div><b>{m.name}</b><small>{returns.filter(r=>r.member===m.name&&r.date===todayKey).reduce((sum,r)=>sum+r.qty,0)} porsi kembali · keputusan untuk seluruh menu</small></div><span className={`decision-status ${getMemberDecision(m.name)==='Sedekahkan'?'donate':getMemberDecision(m.name)==='Ambil Nanti'?'pickup':'pending'}`}>{getMemberDecision(m.name)}</span></div>)}</div></div>
         <div className="panel table-panel"><div className="panel-head"><div><h3>Aktivitas member</h3><p>Ringkasan barang masuk dan kembali</p></div><button className="text-button" onClick={()=>setPage('Laporan')}>Lihat laporan <ArrowUpRight size={15}/></button></div><MemberTable rows={memberStats.slice(0,5)} showMoney={false}/></div>
       </>}      {page==='Dashboard'&&role==='Admin'&&<>
-        <div className="welcome-row"><div><h2>Dashboard Admin</h2><p>Kelola pencatatan barang dan data member hari ini.</p></div><div className="date-pill">3 November 2026</div></div>
+        <div className="welcome-row"><div><h2>Dashboard Admin</h2><p>Kelola pencatatan barang dan data member hari ini.</p></div><div className="date-pill">{formatLocalDateKey(todayKey)}</div></div>
         <div className="stats-grid">
           <Stat icon={<Users/>} label="Member aktif" value={`${members.length}`} sub="Daftar member Bekal Pagi"/>
           <Stat icon={<Package/>} label="Barang masuk" value={`${totalDelivery} porsi`} sub="Total seluruh member"/>
@@ -318,7 +321,7 @@ export default function Dashboard() {
         <div className="content-grid"><div className="panel"><div className="panel-head"><div><h3>Input barang</h3><p>Pilih pekerjaan yang ingin dilakukan.</p></div></div><button className="primary-btn" onClick={()=>setPage('Input Barang Masuk')}>Input barang masuk</button><button className="outline-button full" onClick={()=>setPage('Input Barang Kembali')}>Input barang kembali</button></div><div className="panel"><div className="panel-head"><div><h3>Retur per cabang</h3><p>Ringkasan operasional, tanpa rincian keuangan.</p></div></div><div className="branch-list">{branches.map(b=><div className="branch-row" key={b}><div className="branch-icon"><Store size={18}/></div><div className="branch-name"><b>{b}</b><small>{returns.filter(r=>r.branch===b&&String(r.date).slice(0,10)===dashboardDate).length} catatan menu</small></div><strong>{returns.filter(r=>r.branch===b&&String(r.date).slice(0,10)===dashboardDate).reduce((a,r)=>a+r.qty,0)} <small>porsi</small></strong></div>)}</div></div></div>
       </>}
       {page==='Dashboard'&&role==='Staff'&&<>
-        <div className="welcome-row"><div><h2>Dashboard Staff</h2><p>Fokus pada pencatatan barang kembali di cabang.</p></div><div className="date-pill">3 November 2026</div></div>
+        <div className="welcome-row"><div><h2>Dashboard Staff</h2><p>Fokus pada pencatatan barang kembali di cabang.</p></div><div className="date-pill">{formatLocalDateKey(todayKey)}</div></div>
         <div className="stats-grid">
           <Stat icon={<Store/>} label="Cabang" value="4" sub="Pilih cabang saat input retur"/>
           <Stat icon={<Boxes/>} label="Menu tersedia" value={`${members.reduce((a,m)=>a+m.products.length,0)}`} sub="Daftar menu seluruh member"/>
